@@ -1,7 +1,9 @@
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-import assign_PE_max_output_filter
+#import assign_PE_max_output_filter
+# Change this line in your GA code:
+import assign_PE_max_output_filter_cpp as assign_PE_max_output_filter
 import pretrained_models_torchvision
 from pretrained_models_torchvision import get_pruned_weights_dict
 from tqdm import tqdm
@@ -13,7 +15,7 @@ start_time = time.time()
 weights_dict = get_pruned_weights_dict(pruning_amount=0.67)
 
 # --- GA Hyperparameters ---
-POP_SIZE = 100
+POP_SIZE = 10000
 NUM_GENERATIONS = 100
 MUTATION_RATE = 0.04
 TOURNAMENT_SIZE = 6
