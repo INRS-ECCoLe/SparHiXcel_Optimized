@@ -63,8 +63,8 @@ def model_weights_to_numpy(model):
 # Convert the pruned model weights to NumPy arrays
 weights_dict = model_weights_to_numpy(model)
 def get_pruned_weights_dict(pruning_amount=0.7):
-    #model = models.efficientnet_v2_s(weights='IMAGENET1K_V1')
-    model = models.vgg16(pretrained=True)
+    model = models.efficientnet_v2_s(weights='IMAGENET1K_V1')
+    #model = models.vgg16(pretrained=True)
     model = prune_weights(model, pruning_amount)
     return model_weights_to_numpy(model)
 

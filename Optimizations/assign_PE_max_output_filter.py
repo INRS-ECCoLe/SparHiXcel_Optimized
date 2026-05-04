@@ -1,7 +1,7 @@
 import numpy as np
 import math
 import filter_assign
-#import allocate_mux_tran
+import allocate_mux_tran
 import scale
 import quantize
 #import function_f_sel_and_weight
@@ -61,7 +61,7 @@ def assign_PE_max_output_filter (N_ROWS_ARRAY, N_COLS_ARRAY, max_output_filter, 
   #f_s = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
   #weights_array = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
   #en_adder_node =  np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
-  result_col = np.zeros((1,N_COLS_ARRAY))
+  result_col = -1 * np.ones((1,N_COLS_ARRAY+1)) 
   #PE_array_weights = []
   #PE_array_weights.append([])
   #PE_array_index= []
@@ -76,8 +76,8 @@ def assign_PE_max_output_filter (N_ROWS_ARRAY, N_COLS_ARRAY, max_output_filter, 
   #sel_mux_transfer.append([])
   #en_adder_node_all = []
   #en_adder_node_all.append([])
-  result_columns= []
-  result_columns.append([])
+  #result_columns= []
+  #result_columns.append([])
   count = 0
   #indexes=[]
   #f_sels = []
@@ -104,92 +104,108 @@ def assign_PE_max_output_filter (N_ROWS_ARRAY, N_COLS_ARRAY, max_output_filter, 
 
         fill_array = full_array - remaining_array + num_of_col
         max_column = int(np.max(fill_array))
-        last_non_zero_index = int(np.argmax(result_col))
-        if np.all(result_col == 0):
-          select_col =  max_column - 1
-        elif (last_non_zero_index < max_column - 1):
-          select_col =  max_column - 1
-        else:
-          select_col =  last_non_zero_index + 1
+        #last_non_zero_index = int(np.argmax(result_col))
+        if ((num_of_col != 0).any()):
+        
+          if np.all(result_col == -1):
+            select_col =  max_column - 1
+          #elif (last_non_zero_index < max_column - 1):
+            #select_col =  max_column - 1
+          else:
+            m = 0
+            for i in range(N_ROWS_ARRAY):
+              if num_of_col[i , 0]!= 0:
+                m = max(m, int(fill_array[i, 0]))
+               
+            for j in range(m - 1, result_col.shape[1]):
+              if result_col[0, j] == -1:
+                select_col = j
+                break
 
+          if ((remaining_array - num_of_col>= 0).all() and select_col < N_COLS_ARRAY):
 
-        if ((remaining_array - num_of_col>= 0).all() and select_col < N_COLS_ARRAY):
+            #f_sels_temp = []
+            #weights_temp = []
+            num_added = 0
+            num_of_col_temp = np.zeros((N_ROWS_ARRAY,1))
+            for ch_num in range((ch_slices_num)*math.floor(N_ROWS_ARRAY/f_weights.shape[0]),min((ch_slices_num+1)*math.floor(N_ROWS_ARRAY/f_weights.shape[0]), f_weights.shape[2])):
 
-          #f_sels_temp = []
-          #weights_temp = []
-          num_added = 0
-          num_of_col_temp = np.zeros((N_ROWS_ARRAY,1))
-          for ch_num in range((ch_slices_num)*math.floor(N_ROWS_ARRAY/f_weights.shape[0]),min((ch_slices_num+1)*math.floor(N_ROWS_ARRAY/f_weights.shape[0]), f_weights.shape[2])):
+              if (num_of_col[f_weights.shape[0]*(ch_num % math.floor(N_ROWS_ARRAY/f_weights.shape[0]) ) , 0] != 0) :  
+                transfer_distance = select_col - fill_array[f_weights.shape[0]*(ch_num % math.floor(N_ROWS_ARRAY/f_weights.shape[0]) ) , 0]+1
+                #print(transfer_distance)
+                if transfer_distance > max_mux_trans:
 
-            transfer_distance = select_col - fill_array[f_weights.shape[0]*(ch_num % math.floor(N_ROWS_ARRAY/f_weights.shape[0]) ) , 0]+1
-            #print(transfer_distance)
-            if transfer_distance > max_mux_trans:
+                  num_of_col_temp [f_weights.shape[0]*(ch_num % math.floor(N_ROWS_ARRAY/f_weights.shape[0]) ) : f_weights.shape[0]*(1 + ch_num % math.floor(N_ROWS_ARRAY/f_weights.shape[0])) , 0] = transfer_distance - max_mux_trans
+                  #f_select = np.zeros((f_weights_sorted[:,:,ch_num, filter_num].shape[0],int(transfer_distance - max_mux_trans)))
+                  #weight = np.zeros((f_weights_sorted[:,:,ch_num, filter_num].shape[0],int(transfer_distance - max_mux_trans)))
+                  num_added += transfer_distance - max_mux_trans
+                  #f_sels_temp.append(f_select)
+                  #weights_temp.append(weight)
+            if ((remaining_array - num_of_col - num_of_col_temp>= 0).all()):
 
-              num_of_col_temp [f_weights.shape[0]*(ch_num % math.floor(N_ROWS_ARRAY/f_weights.shape[0]) ) : f_weights.shape[0]*(1 + ch_num % math.floor(N_ROWS_ARRAY/f_weights.shape[0])) , 0] = transfer_distance - max_mux_trans
-              #f_select = np.zeros((f_weights_sorted[:,:,ch_num, filter_num].shape[0],int(transfer_distance - max_mux_trans)))
-              #weight = np.zeros((f_weights_sorted[:,:,ch_num, filter_num].shape[0],int(transfer_distance - max_mux_trans)))
-              num_added += transfer_distance - max_mux_trans
-              #f_sels_temp.append(f_select)
-              #weights_temp.append(weight)
-          if ((remaining_array - num_of_col - num_of_col_temp>= 0).all()):
+              if ((num_of_col_temp != 0 ).any()):
 
-            if ((num_of_col_temp != 0 ).any()):
+                number_col_removed -= num_added
+                #n_columns = function_col_num(n_columns, num_of_col_temp, remaining_array, full_array)
+                #f_s , weights_array = function_f_sel_and_weight(f_s, f_sels_temp, weights_array, weights_temp, remaining_array, full_array, f_weights.shape[0])
+                remaining_array = remaining_array - num_of_col_temp
+                filled_array = full_array - remaining_array
+                #f_sels_temp = []
+                #weights_temp = []
+                num_of_col_temp = np.zeros((N_ROWS_ARRAY,1))
 
-              number_col_removed -= num_added
-              #n_columns = function_col_num(n_columns, num_of_col_temp, remaining_array, full_array)
-              #f_s , weights_array = function_f_sel_and_weight(f_s, f_sels_temp, weights_array, weights_temp, remaining_array, full_array, f_weights.shape[0])
-              remaining_array = remaining_array - num_of_col_temp
-              filled_array = full_array - remaining_array
-              #f_sels_temp = []
-              #weights_temp = []
-              num_of_col_temp = np.zeros((N_ROWS_ARRAY,1))
-
+              #PE_array_index[count].append(indexes)
+              #PE_array_filter_num[count].append(filter_num + 1)
+              #n_columns = function_col_num(n_columns, num_of_col, remaining_array, full_array)
+              #f_s , weights_array = function_f_sel_and_weight(f_s, f_sels, weights_array, weights, remaining_array, full_array, f_weights.shape[0])
+              remaining_array = remaining_array - num_of_col
+              result_col, filled_array = allocate_mux_tran.allocate_mux_tran (num_of_col, remaining_array, full_array, result_col, filter_num, filled_array)
+              #filled_array = full_array - remaining_array
+              num_of_col = np.zeros((N_ROWS_ARRAY,1))
+              #indexes = []
+              #f_sels = []
+              #weights = []
+            else:
+              result_col = -1 * np.ones((1,N_COLS_ARRAY+1))
+              remaining_array = N_COLS_ARRAY * np.ones((N_ROWS_ARRAY, 1))
+              filled_array = np.zeros((N_ROWS_ARRAY, 1))
+              count +=1
+              remaining_array = remaining_array - num_of_col
+              result_col, filled_array = allocate_mux_tran.allocate_mux_tran (num_of_col, remaining_array, full_array, result_col, filter_num, f_weights.shape[0], filled_array)
+          else:
+            #PE_array_weights[count].append(weights_array)
+            #weights_array = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
+            #PE_array_weights.append([])
+            #num_of_columns[count].append(n_columns)
+            #n_columns = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
+            #num_of_columns.append([])
+            #PE_array_f_sel[count].append(f_s)
+            #f_s = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
+            #PE_array_f_sel.append([])
+            #sel_mux_transfer[count].append(sel_mux_tr)
+            #sel_mux_tr = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
+            #sel_mux_transfer.append([])
+            #result_columns[count].append(result_col)
+            result_col = -1 * np.ones((1,N_COLS_ARRAY+1)) 
+            #result_columns.append([])
+            #en_adder_node_all[count].append(en_adder_node)
+            #en_adder_node = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
+            #en_adder_node_all.append([])
+            remaining_array = N_COLS_ARRAY * np.ones((N_ROWS_ARRAY, 1))
+            filled_array = np.zeros((N_ROWS_ARRAY, 1))
+            #f_s , weights_array = function_f_sel_and_weight.function_f_sel_and_weight(f_s, f_sels, weights_array, weights, remaining_array, full_array, f_weights.shape[0])
+            #n_columns = function_col_num.function_col_num(n_columns, num_of_col, remaining_array, full_array)
+            #PE_array_index.append([])
+            #PE_array_filter_num.append([])
+            count +=1
             #PE_array_index[count].append(indexes)
             #PE_array_filter_num[count].append(filter_num + 1)
-            #n_columns = function_col_num(n_columns, num_of_col, remaining_array, full_array)
-            #f_s , weights_array = function_f_sel_and_weight(f_s, f_sels, weights_array, weights, remaining_array, full_array, f_weights.shape[0])
-            remaining_array = remaining_array - num_of_col
-            #sel_mux_tr, result_col, en_adder_node, filled_array = allocate_mux_tran (num_of_col, remaining_array, full_array, sel_mux_tr, result_col, en_adder_node, filter_num, f_weights.shape[0], filled_array)
-            filled_array = full_array - remaining_array
-            num_of_col = np.zeros((N_ROWS_ARRAY,1))
-            #indexes = []
+            #indexes =[]
             #f_sels = []
             #weights = []
-
-        else:
-          #PE_array_weights[count].append(weights_array)
-          #weights_array = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
-          #PE_array_weights.append([])
-          #num_of_columns[count].append(n_columns)
-          #n_columns = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
-          #num_of_columns.append([])
-          #PE_array_f_sel[count].append(f_s)
-          #f_s = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
-          #PE_array_f_sel.append([])
-          #sel_mux_transfer[count].append(sel_mux_tr)
-          #sel_mux_tr = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
-          #sel_mux_transfer.append([])
-          #result_columns[count].append(result_col)
-          #result_col = np.zeros((1,N_COLS_ARRAY))
-          #result_columns.append([])
-          #en_adder_node_all[count].append(en_adder_node)
-          #en_adder_node = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
-          #en_adder_node_all.append([])
-          remaining_array = N_COLS_ARRAY * np.ones((N_ROWS_ARRAY, 1))
-          filled_array = np.zeros((N_ROWS_ARRAY, 1))
-          #f_s , weights_array = function_f_sel_and_weight.function_f_sel_and_weight(f_s, f_sels, weights_array, weights, remaining_array, full_array, f_weights.shape[0])
-          #n_columns = function_col_num.function_col_num(n_columns, num_of_col, remaining_array, full_array)
-          #PE_array_index.append([])
-          #PE_array_filter_num.append([])
-          count +=1
-          #PE_array_index[count].append(indexes)
-          #PE_array_filter_num[count].append(filter_num + 1)
-          #indexes =[]
-          #f_sels = []
-          #weights = []
-          remaining_array = remaining_array - num_of_col
-          #sel_mux_tr, result_col, en_adder_node, filled_array = allocate_mux_tran.allocate_mux_tran (num_of_col, remaining_array, full_array, sel_mux_tr, result_col, en_adder_node, filter_num, f_weights.shape[0], filled_array)
-          filled_array = full_array - remaining_array
+            remaining_array = remaining_array - num_of_col
+            result_col, filled_array = allocate_mux_tran.allocate_mux_tran (num_of_col, remaining_array, full_array, result_col, filter_num, filled_array)
+            #filled_array = full_array - remaining_array
 
       #PE_array_weights[count].append(weights_array)
       #weights_array = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
@@ -204,7 +220,7 @@ def assign_PE_max_output_filter (N_ROWS_ARRAY, N_COLS_ARRAY, max_output_filter, 
       #sel_mux_tr = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
       #sel_mux_transfer.append([])
       #result_columns[count].append(result_col)
-      #result_col = np.zeros((1,N_COLS_ARRAY))
+      result_col = -1 * np.ones((1,N_COLS_ARRAY+1)) 
       #result_columns.append([])
       #en_adder_node_all[count].append(en_adder_node)
       #en_adder_node = np.zeros((N_ROWS_ARRAY,N_COLS_ARRAY))
