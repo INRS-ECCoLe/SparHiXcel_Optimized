@@ -4,7 +4,7 @@ This repository contains the implementation of ordering optimization and structu
 
 **"High-Efficiency Sparsity-Aware FPGA Accelerator with Column-Wise Compression for Efficient CNN Inference"**
 
-This work belongs to the **SparHiXcel-v2** framework and focuses on improving the efficiency of mapping sparse CNN models onto FPGA-based accelerators.
+This work belongs to the **SparHiXcel-v2** framework and focuses on improving the efficiency of mapping sparse CNN models onto FPGA-based accelerator SparHiXcel.
 
 ---
 
